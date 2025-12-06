@@ -27,7 +27,7 @@ def approach1_frangi(img):
     )
 
     frangi_map = np.nan_to_num(frangi_map)
-    frangi_map = (frangi_map - frangi_map.min()) / (frangi_map.ptp() + 1e-8)
+    frangi_map = (frangi_map - frangi_map.min()) / (np.ptp(frangi_map) + 1e-8)
 
     thresh = threshold_sauvola(frangi_map, window_size=35, k=0.15)
     binary = (frangi_map > thresh).astype(np.uint8) * 255
@@ -60,7 +60,7 @@ def approach2_hessian_minpath(img):
 
     response = -lambda2
     response = np.nan_to_num(response)
-    response = (response - response.min()) / (response.ptp() + 1e-8)
+    response = (response - response.min()) / (np.ptp(response) + 1e-8)
 
     # Much lower threshold + adaptive
     thresh = np.percentile(response, 92)  # Was too high before
@@ -208,7 +208,7 @@ def approach5_phase_congruency(img):
         response += np.abs(eigvals[1])
 
     # Normalize and slightly smooth to suppress very small speckle
-    response = (response - response.min()) / (response.ptp() + 1e-8)
+    response = (response - response.min()) / (np.ptp(response) + 1e-8)
     response = gaussian(response, sigma=0.8)
 
     # Use percentile threshold instead of Otsu to be more permissive
