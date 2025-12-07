@@ -1,4 +1,8 @@
 *.zip
+*.rar
+*.tar.gz
+*.7z
+*.log
 dataset/Concrete & Pavement Crack Dataset
 dataset/evaluation/CrackForest-dataset-master/groundTruth
 dataset/evaluation/CrackForest-dataset-master/seg
