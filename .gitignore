@@ -1,2 +1,9 @@
-dataset/
+*.zip
+dataset/Concrete & Pavement Crack Dataset
+dataset/evaluation/CrackForest-dataset-master/groundTruth
+dataset/evaluation/CrackForest-dataset-master/seg
 output/
+example/
+
+test.py
+tree.py
