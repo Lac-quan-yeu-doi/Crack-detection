@@ -273,7 +273,7 @@ if __name__ == "__main__":
     image_path = (
         "dataset/Concrete & Pavement Crack Dataset/Positive/00020.jpg"  # CHANGE THIS
     )
-    image_path = "./329.jpg"  # Alternative test image
+    image_path = "./example/0077.jpg"  # Alternative test image
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     if img is None:
         raise FileNotFoundError("Image not found! Check path.")

@@ -8,6 +8,12 @@ dataset/evaluation/CrackForest-dataset-master/groundTruth
 dataset/evaluation/CrackForest-dataset-master/seg
 output/
 example/
+report/
+paper/
 
+
+rp_note.md
+crack_detection.py
 test.py
 tree.py
+experiments.ipynb
