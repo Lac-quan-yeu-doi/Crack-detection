@@ -1,1 +1,20 @@
-dataset/
+*.zip
+*.rar
+*.tar.gz
+*.7z
+*.log
+dataset/Concrete & Pavement Crack Dataset
+dataset/evaluation/CrackForest-dataset-master/groundTruth
+dataset/evaluation/CrackForest-dataset-master/seg
+output/
+example/
+report/
+paper/
+result/
+
+
+rp_note.md
+crack_detection.py
+test.py
+tree.py
+experiments.ipynb

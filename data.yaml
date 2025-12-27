@@ -1,7 +1,0 @@
-path: /path/to/dataset  # Root dir
-train: images/train
-val: images/val
-test: images/test
-
-nc: 1  # Num classes
-names: ['crack']  # Class names
