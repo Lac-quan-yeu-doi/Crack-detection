@@ -11,7 +11,8 @@ example/
 report/
 paper/
 result/
-
+real_life_image/
+bitplane_results/
 
 rp_note.md
 crack_detection.py
