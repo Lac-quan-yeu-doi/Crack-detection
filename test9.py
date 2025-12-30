@@ -1,3 +1,4 @@
+# test9 => improve from test7 with gradient
 import cv2
 import os
 import math
@@ -26,7 +27,7 @@ def overlay_mask_on_image(image, mask, color=(255, 0, 0), alpha=0.5):
 
 def crack_detection(image_input, output_dir="result"):
     os.makedirs(output_dir, exist_ok=True)
-
+    
     if isinstance(image_input, str):
         original_color = cv2.imread(image_input)
         gray = cv2.imread(image_input, cv2.IMREAD_GRAYSCALE)
@@ -113,17 +114,17 @@ def crack_detection(image_input, output_dir="result"):
     return original_color, final_mask
 
 def inpaint_bitplane_reflection(original_img, mask,
-                                window_size=21,         # Odd: window side
-                                stride=5,               # Shift step
-                                priority='horizontal',  # 'horizontal' or 'vertical' first
-                                gaussian_ksize=11,      # Final Gaussian kernel (odd)
-                                gaussian_sigma=1.0):    # Sigma (0 = auto)
+                                window_size=21,         # Local window for gradient analysis
+                                stride=5,
+                                priority="horizontal",
+                                gaussian_ksize=11,
+                                gaussian_sigma=1.0):
     """
-    Your bit-plane reflection mirroring inpainting.
-    - Per bit-plane per channel
-    - Slide window; for each crack in window, reflect over priority axis
-    - If source is crack, try other direction
-    - Final targeted Gaussian on crack areas
+    Adaptive bit-plane reflection inpainting using local gradient orientation.
+    - For each crack pixel, analyze local gradient to determine crack direction
+    - If crack is horizontal → prefer vertical reflection (copy from above/below)
+    - If crack is vertical → prefer horizontal reflection (copy from left/right)
+    - Final Gaussian on original crack areas
     """
     img = original_img.copy().astype(np.uint8)
     h, w = img.shape[:2]
@@ -140,26 +141,27 @@ def inpaint_bitplane_reflection(original_img, mask,
     if mask_bool.ndim == 3:
         mask_bool = mask_bool.squeeze()
 
-    # Original mask for final blur
     original_mask_bool = mask_bool.copy()
 
     half_win = window_size // 2
 
-    # Directions
-    directions = ['horizontal', 'vertical'] if priority == 'horizontal' else ['vertical', 'horizontal']
+    # Precompute gradient magnitude and angle on grayscale version
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if channels == 3 else img.squeeze()
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+    grad_mag = np.hypot(sobelx, sobely)
+    grad_ang = np.arctan2(sobely, sobelx)  # -pi to pi
 
-    # Process each channel
     result = np.zeros_like(img)
+
     for c in range(channels):
         channel = img[:, :, c]
-
-        # 8 bit planes
         bit_planes = [(channel & (1 << b)) >> b for b in range(8)]
 
         processed_planes = []
         for bp in bit_planes:
             bp_processed = bp.copy()
-            mask_processed = mask_bool.copy()  # Reset per bit plane? No, shared fills, but since bit independent, but to propagate, use per bp
+            mask_processed = mask_bool.copy()
 
             for y in range(half_win, h - half_win, stride):
                 for x in range(half_win, w - half_win, stride):
@@ -169,38 +171,60 @@ def inpaint_bitplane_reflection(original_img, mask,
                     x2 = x + half_win + 1
 
                     mask_window = mask_processed[y1:y2, x1:x2]
-
                     if not np.any(mask_window):
                         continue
 
+                    # Local gradient in window
+                    local_ang = grad_ang[y1:y2, x1:x2]
+                    local_mag = grad_mag[y1:y2, x1:x2]
+
+                    # Weighted average angle (stronger gradients count more)
+                    angles = local_ang.flatten()
+                    weights = local_mag.flatten()
+                    if np.sum(weights) > 0:
+                        mean_angle = np.arctan2(np.sum(weights * np.sin(angles)),
+                                                np.sum(weights * np.cos(angles)))
+                    else:
+                        mean_angle = 0
+
+                    # Dominant direction: horizontal gradient → vertical crack → prefer horizontal reflection
+                    # vertical gradient → horizontal crack → prefer vertical reflection
+                    if abs(np.cos(mean_angle)) > abs(np.sin(mean_angle)):  # more horizontal gradient
+                        directions = ['vertical', 'horizontal']
+                    elif abs(np.cos(mean_angle)) < abs(np.sin(mean_angle)):
+                        directions = ['horizontal', 'vertical']
+                    else:
+                        if priority == "horizontal":
+                            directions = ['horizontal', 'vertical']
+                        else:
+                            directions = ['vertical', 'horizontal']
+
                     for ry in range(window_size):
                         for rx in range(window_size):
-                            if mask_window[ry, rx]:
-                                py = y1 + ry
-                                px = x1 + rx
+                            if not mask_window[ry, rx]:
+                                continue
 
-                                filled = False
-                                for dir in directions:
-                                    if dir == 'horizontal':  # Flip left-right over vertical center
-                                        refl_rx = 2 * half_win - rx
-                                        refl_ry = ry
-                                        flag = "horizontal"
-                                    else:  # Flip up-down over horizontal center
-                                        refl_rx = rx
-                                        refl_ry = 2 * half_win - ry
-                                        flag = "vertical"
+                            py = y1 + ry
+                            px = x1 + rx
 
-                                    # Source absolute
-                                    source_y = y1 + refl_ry
-                                    source_x = x1 + refl_rx
+                            filled = False
+                            for dir in directions:
+                                if dir == 'horizontal':
+                                    refl_rx = 2 * half_win - rx
+                                    refl_ry = ry
+                                else:
+                                    refl_rx = rx
+                                    refl_ry = 2 * half_win - ry
 
-                                    if 0 <= source_y < h and 0 <= source_x < w:
-                                        if not mask_processed[source_y, source_x]:
-                                            bp_processed[py, px] = bp[source_y, source_x]
-                                            mask_processed[py, px] = False
-                                            filled = True
-                                            # print(f"Use {flag}")
-                                            break
+                                source_y = y1 + refl_ry
+                                source_x = x1 + refl_rx
+
+                                if 0 <= source_y < h and 0 <= source_x < w:
+                                    if not mask_processed[source_y, source_x]:
+                                        bp_processed[py, px] = bp[source_y, source_x]
+                                        mask_processed[py, px] = False
+                                        filled = True
+                                        break
 
             processed_planes.append(bp_processed)
 
@@ -211,15 +235,14 @@ def inpaint_bitplane_reflection(original_img, mask,
 
         result[:, :, c] = reconstructed
 
-    # === Final Gaussian smoothing on original crack regions ===
+    # Final Gaussian smoothing on original crack regions
     if gaussian_ksize > 1:
-        print(f"Applying targeted Gaussian blur (ksize={gaussian_ksize}, sigma={gaussian_sigma}) to crack regions...")
+        print(f"Applying targeted Gaussian blur (ksize={gaussian_ksize}, sigma={gaussian_sigma})...")
         blurred = cv2.GaussianBlur(result, (gaussian_ksize, gaussian_ksize), gaussian_sigma)
 
-        if channels == 1:
-            crack_mask_3d = original_mask_bool
-        else:
-            crack_mask_3d = np.repeat(original_mask_bool[..., np.newaxis], channels, axis=2)
+        crack_mask_3d = original_mask_bool[..., np.newaxis] if channels > 1 else original_mask_bool
+        if channels > 1:
+            crack_mask_3d = np.repeat(crack_mask_3d, channels, axis=2)
 
         result[crack_mask_3d] = blurred[crack_mask_3d]
 
@@ -231,23 +254,21 @@ def inpaint_bitplane_reflection(original_img, mask,
 # ==================== Test Function ====================
 def test_bitplane_reflection_inpainting(image_path, output_dir="bitplane_results"):
     os.makedirs(output_dir, exist_ok=True)
-
-    # import utils
-    # img = cv2.imread(image_path)
-    # down = utils.downsample(img, 0.4)
-    # original, final_mask = crack_detection(down, output_dir)   
     
     original, final_mask = crack_detection(image_path, output_dir)
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    print(f"Org: {type(original)} - Size: {original.shape}")
+    print(f"Mask: {type(final_mask)} - Size: {final_mask.shape}")
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
     mask_dilated = cv2.dilate(final_mask, kernel, iterations=1)
 
     print("Running your BIT-PLANE REFLECTION INPAINTING...")
     inpainted = inpaint_bitplane_reflection(original, mask_dilated,
-                                            window_size=45,
-                                            stride=10,
-                                            priority='vertical',
-                                            gaussian_ksize=3,
+                                            window_size=125,
+                                            stride=5,
+                                            priority='horizontal',
+                                            gaussian_ksize=5,
                                             gaussian_sigma=0.2)
 
     cv2.imwrite(os.path.join(output_dir, "bitplane_result.jpg"), inpainted)
@@ -294,7 +315,7 @@ def test_bitplane_reflection_inpainting(image_path, output_dir="bitplane_results
 
 
 if __name__ == "__main__":
-    image_path = "D:/University/Computer Vision/BTL/example/005.jpg"
+    image_path = "D:/University/Computer Vision/BTL/example/065.jpg"
     # image_path = "real_life_image/jpg/2025_12_27_17_45_IMG_6463.jpg"
     # image_path = "real_life_image/jpg/2025_12_27_17_49_IMG_6476.jpg"
     # image_path = "D:/University/Computer Vision/BTL/example/crack2.jpg"

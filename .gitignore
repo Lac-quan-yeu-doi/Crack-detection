@@ -13,6 +13,7 @@ paper/
 result/
 real_life_image/
 bitplane_results/
+final_result/
 
 rp_note.md
 crack_detection.py

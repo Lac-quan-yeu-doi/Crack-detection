@@ -1,3 +1,4 @@
+# test8 => improve from test7 add the non-crack ratio condition
 import cv2
 import os
 import math
@@ -113,17 +114,17 @@ def crack_detection(image_input, output_dir="result"):
     return original_color, final_mask
 
 def inpaint_bitplane_reflection(original_img, mask,
-                                window_size=21,         # Odd: window side
-                                stride=5,               # Shift step
-                                priority='horizontal',  # 'horizontal' or 'vertical' first
-                                gaussian_ksize=11,      # Final Gaussian kernel (odd)
-                                gaussian_sigma=1.0):    # Sigma (0 = auto)
+                                window_size=21,         # Odd number
+                                stride=5,
+                                priority='horizontal',  # Used only when ratios equal
+                                gaussian_ksize=11,
+                                gaussian_sigma=1.0):
     """
-    Your bit-plane reflection mirroring inpainting.
-    - Per bit-plane per channel
-    - Slide window; for each crack in window, reflect over priority axis
-    - If source is crack, try other direction
-    - Final targeted Gaussian on crack areas
+    Advanced bit-plane reflection inpainting with ratio-based direction selection.
+    - For each crack pixel, reflect horizontally and vertically
+    - If both reflections valid, choose direction with higher non-crack ratio in symmetric region
+    - If equal, use priority
+    - Final Gaussian on original crack areas
     """
     img = original_img.copy().astype(np.uint8)
     h, w = img.shape[:2]
@@ -140,26 +141,20 @@ def inpaint_bitplane_reflection(original_img, mask,
     if mask_bool.ndim == 3:
         mask_bool = mask_bool.squeeze()
 
-    # Original mask for final blur
-    original_mask_bool = mask_bool.copy()
+    original_mask_bool = mask_bool.copy()  # For final blur
 
     half_win = window_size // 2
 
-    # Directions
-    directions = ['horizontal', 'vertical'] if priority == 'horizontal' else ['vertical', 'horizontal']
-
-    # Process each channel
     result = np.zeros_like(img)
+
     for c in range(channels):
         channel = img[:, :, c]
-
-        # 8 bit planes
         bit_planes = [(channel & (1 << b)) >> b for b in range(8)]
 
         processed_planes = []
         for bp in bit_planes:
             bp_processed = bp.copy()
-            mask_processed = mask_bool.copy()  # Reset per bit plane? No, shared fills, but since bit independent, but to propagate, use per bp
+            mask_processed = mask_bool.copy()
 
             for y in range(half_win, h - half_win, stride):
                 for x in range(half_win, w - half_win, stride):
@@ -169,38 +164,65 @@ def inpaint_bitplane_reflection(original_img, mask,
                     x2 = x + half_win + 1
 
                     mask_window = mask_processed[y1:y2, x1:x2]
-
                     if not np.any(mask_window):
                         continue
 
                     for ry in range(window_size):
                         for rx in range(window_size):
-                            if mask_window[ry, rx]:
-                                py = y1 + ry
-                                px = x1 + rx
+                            if not mask_window[ry, rx]:
+                                continue
 
-                                filled = False
-                                for dir in directions:
-                                    if dir == 'horizontal':  # Flip left-right over vertical center
-                                        refl_rx = 2 * half_win - rx
-                                        refl_ry = ry
-                                        flag = "horizontal"
-                                    else:  # Flip up-down over horizontal center
-                                        refl_rx = rx
-                                        refl_ry = 2 * half_win - ry
-                                        flag = "vertical"
+                            py = y1 + ry
+                            px = x1 + rx
 
-                                    # Source absolute
-                                    source_y = y1 + refl_ry
-                                    source_x = x1 + refl_rx
+                            # Horizontal reflection (over vertical center axis)
+                            h_refl_rx = 2 * half_win - rx
+                            h_refl_ry = ry
+                            h_source_y = y1 + h_refl_ry
+                            h_source_x = x1 + h_refl_rx
 
-                                    if 0 <= source_y < h and 0 <= source_x < w:
-                                        if not mask_processed[source_y, source_x]:
-                                            bp_processed[py, px] = bp[source_y, source_x]
-                                            mask_processed[py, px] = False
-                                            filled = True
-                                            # print(f"Use {flag}")
-                                            break
+                            # Vertical reflection (over horizontal center axis)
+                            v_refl_ry = 2 * half_win - ry
+                            v_refl_rx = rx
+                            v_source_y = y1 + v_refl_ry
+                            v_source_x = x1 + v_refl_rx
+
+                            h_valid = (0 <= h_source_y < h and 0 <= h_source_x < w and not mask_processed[h_source_y, h_source_x])
+                            v_valid = (0 <= v_source_y < h and 0 <= v_source_x < w and not mask_processed[v_source_y, v_source_x])
+
+                            if not h_valid and not v_valid:
+                                continue  # Both invalid
+
+                            if h_valid and not v_valid:
+                                # Only horizontal valid
+                                bp_processed[py, px] = bp[h_source_y, h_source_x]
+                            elif v_valid and not h_valid:
+                                # Only vertical valid
+                                bp_processed[py, px] = bp[v_source_y, v_source_x]
+                            else:
+                                # Both valid → compare non-crack ratios in symmetric regions
+                                # Horizontal symmetric region: left/right of vertical center
+                                h_region_mask = mask_processed[y1:y2, x1:x1 + half_win + 1]  # left half + center
+                                h_region_mask = np.concatenate((h_region_mask[:, ::-1][:, :-1], h_region_mask), axis=1)  # mirror left
+                                h_non_crack_ratio = 1 - np.mean(h_region_mask)
+
+                                # Vertical symmetric region: above/below horizontal center
+                                v_region_mask = mask_processed[y1:y1 + half_win + 1, x1:x2]
+                                v_region_mask = np.concatenate((v_region_mask[::-1][:-1, :], v_region_mask), axis=0)
+                                v_non_crack_ratio = 1 - np.mean(v_region_mask)
+
+                                if h_non_crack_ratio > v_non_crack_ratio:
+                                    bp_processed[py, px] = bp[h_source_y, h_source_x]
+                                elif v_non_crack_ratio > h_non_crack_ratio:
+                                    bp_processed[py, px] = bp[v_source_y, v_source_x]
+                                else:
+                                    # Equal → use priority
+                                    if priority == 'horizontal':
+                                        bp_processed[py, px] = bp[h_source_y, h_source_x]
+                                    else:
+                                        bp_processed[py, px] = bp[v_source_y, v_source_x]
+
+                            mask_processed[py, px] = False  # Mark as filled
 
             processed_planes.append(bp_processed)
 
@@ -211,15 +233,14 @@ def inpaint_bitplane_reflection(original_img, mask,
 
         result[:, :, c] = reconstructed
 
-    # === Final Gaussian smoothing on original crack regions ===
+    # Final Gaussian smoothing on original crack regions
     if gaussian_ksize > 1:
-        print(f"Applying targeted Gaussian blur (ksize={gaussian_ksize}, sigma={gaussian_sigma}) to crack regions...")
+        print(f"Applying targeted Gaussian blur (ksize={gaussian_ksize}, sigma={gaussian_sigma})...")
         blurred = cv2.GaussianBlur(result, (gaussian_ksize, gaussian_ksize), gaussian_sigma)
 
-        if channels == 1:
-            crack_mask_3d = original_mask_bool
-        else:
-            crack_mask_3d = np.repeat(original_mask_bool[..., np.newaxis], channels, axis=2)
+        crack_mask_3d = original_mask_bool[..., np.newaxis] if channels > 1 else original_mask_bool
+        if channels > 1:
+            crack_mask_3d = np.repeat(crack_mask_3d, channels, axis=2)
 
         result[crack_mask_3d] = blurred[crack_mask_3d]
 
@@ -246,7 +267,7 @@ def test_bitplane_reflection_inpainting(image_path, output_dir="bitplane_results
     inpainted = inpaint_bitplane_reflection(original, mask_dilated,
                                             window_size=45,
                                             stride=10,
-                                            priority='vertical',
+                                            priority='horizontal',
                                             gaussian_ksize=3,
                                             gaussian_sigma=0.2)
 
@@ -294,7 +315,7 @@ def test_bitplane_reflection_inpainting(image_path, output_dir="bitplane_results
 
 
 if __name__ == "__main__":
-    image_path = "D:/University/Computer Vision/BTL/example/005.jpg"
+    image_path = "D:/University/Computer Vision/BTL/example/065.jpg"
     # image_path = "real_life_image/jpg/2025_12_27_17_45_IMG_6463.jpg"
     # image_path = "real_life_image/jpg/2025_12_27_17_49_IMG_6476.jpg"
     # image_path = "D:/University/Computer Vision/BTL/example/crack2.jpg"
