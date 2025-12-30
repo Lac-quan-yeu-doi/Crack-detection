@@ -11,6 +11,11 @@ This repository compares several classic methods (Sobel, Morphological operation
 - All results automatically saved in `/output/`
 - Fully reproducible
 
+## Files
+- Experiment files: `*.ipynb`
+- `utils.py`: containas functions collected from the experiment files `*.ipynb`
+- `main.py`: main code to call functions and method from `utils.py`
+
 ## Requirements
 - Python 3.11+
 - OpenCV, NumPy, Matplotlib, scikit-image, SciPy

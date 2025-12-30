@@ -87,11 +87,10 @@ def inpaint_median_weighted_blend(original_img, mask,
                                   step=6,
                                   ratio=0.05,
                                   max_size=181,
-                                  neighbor_weight=0.6,     # Total weight for 8-neighbors (1 - this = median weight)
+                                  neighbor_weight=0.6, 
                                   gaussian_ksize=9,
                                   gaussian_sigma=1.2):
     """
-    Your LATEST BEST idea:
     - Grow square to collect known (non-crack) pixels
     - Use MEDIAN of those pixels as main texture value
     - Blend with 8-connected known neighbors (including previously filled)
@@ -252,5 +251,5 @@ def test_ultimate_inpainting(image_path, output_dir="ultimate_results"):
 
 
 if __name__ == "__main__":
-    image_path = "D:/University/Computer Vision/BTL/example/crack.jpg"
+    image_path = "D:/University/Computer Vision/BTL/example/065.jpg"
     test_ultimate_inpainting(image_path)

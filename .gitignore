@@ -14,6 +14,7 @@ result/
 real_life_image/
 bitplane_results/
 final_result/
+result_inpainting/
 
 rp_note.md
 crack_detection.py

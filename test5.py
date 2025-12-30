@@ -25,10 +25,14 @@ def crack_detection(image_input, output_dir="result"):
         elif image_input.ndim == 2:  # Already grayscale
             gray = image_input
         else:
-            raise ValueError(f"Invalid image array shape: {image_input.shape}. Expected 2D or 3D.")
+            raise ValueError(
+                f"Invalid image array shape: {image_input.shape}. Expected 2D or 3D."
+            )
     else:
-        raise TypeError(f"Unsupported input type: {type(image_input)}. Must be str (path) or np.ndarray (image).")
-    
+        raise TypeError(
+            f"Unsupported input type: {type(image_input)}. Must be str (path) or np.ndarray (image)."
+        )
+
     gray_norm = gray.astype(np.float32) / 255.0
 
     # Gaussian blur and enhancement
@@ -97,16 +101,19 @@ def crack_detection(image_input, output_dir="result"):
 
     return original_color, final_mask
 
-def inpaint_random_weighted_blend(original_img, mask,
-                                 step=5,
-                                 ratio=0.05,
-                                 max_size=151,
-                                 main_weight=0.4,         # Weight of the randomly selected texture pixel
-                                 gaussian_ksize=9,        # Final Gaussian on filled regions
-                                 gaussian_sigma=1.2,
-                                 random_seed=None):
+
+def inpaint_random_weighted_blend(
+    original_img,
+    mask,
+    step=5,
+    ratio=0.05,
+    max_size=151,
+    main_weight=0.4,
+    gaussian_ksize=9,  # Final Gaussian on filled regions
+    gaussian_sigma=1.2,
+    random_seed=None,
+):
     """
-    Your BEST idea:
     - Randomly select a texture pixel from growing square
     - Blend it with 8-neighbors (including previously filled pixels)
     - main_weight for random pixel, rest shared among neighbors
@@ -127,7 +134,7 @@ def inpaint_random_weighted_blend(original_img, mask,
         channels = img.shape[2]
 
     # Original mask — we fill these pixels
-    mask_bool = (mask > 127)
+    mask_bool = mask > 127
     if mask_bool.ndim == 3:
         mask_bool = mask_bool.squeeze()
 
@@ -138,10 +145,12 @@ def inpaint_random_weighted_blend(original_img, mask,
     if not crack_coords:
         return original_img.astype(np.uint8)
 
-    print(f"Smart weighted inpainting on {len(crack_coords)} crack pixels (main_weight={main_weight})...")
+    print(
+        f"Inpainting on {len(crack_coords)} crack pixels (main_weight={main_weight})..."
+    )
 
     # 8-connectivity offsets
-    neighbors = [(-1,-1), (-1,0), (-1,1), (0,-1), (0,1), (1,-1), (1,0), (1,1)]
+    neighbors = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
     filled = 0
     for py, px in crack_coords:
@@ -215,8 +224,12 @@ def inpaint_random_weighted_blend(original_img, mask,
 
     # === Final: Gaussian smooth only on original crack regions ===
     if gaussian_ksize > 1:
-        print(f"Applying final targeted Gaussian (ksize={gaussian_ksize}, sigma={gaussian_sigma})...")
-        blurred = cv2.GaussianBlur(img, (gaussian_ksize, gaussian_ksize), gaussian_sigma)
+        print(
+            f"Applying final targeted Gaussian (ksize={gaussian_ksize}, sigma={gaussian_sigma})..."
+        )
+        blurred = cv2.GaussianBlur(
+            img, (gaussian_ksize, gaussian_ksize), gaussian_sigma
+        )
 
         # Mask for original crack pixels
         if channels == 1:
@@ -232,10 +245,12 @@ def inpaint_random_weighted_blend(original_img, mask,
 
     return result
 
+
 # ==================== Test Your Best Method ====================
 def test_smart_inpainting(image_path, output_dir="smart_results"):
     os.makedirs(output_dir, exist_ok=True)
     import utils
+
     down = utils.downsample(cv2.imread(image_path), 0.2)
     # original, final_mask = crack_detection(down, output_dir)
     original, final_mask = crack_detection(image_path, output_dir)
@@ -245,14 +260,17 @@ def test_smart_inpainting(image_path, output_dir="smart_results"):
     # mask_dilated = final_mask.copy()
 
     print("Running your SMART weighted blend inpainting...")
-    inpainted = inpaint_random_weighted_blend(original, mask_dilated,
-                                              step=6,
-                                              ratio=0.05,
-                                              max_size=101,
-                                              main_weight=0.9,       # 40% from random texture
-                                              gaussian_ksize=15,
-                                              gaussian_sigma=0.5,
-                                              random_seed=50)
+    inpainted = inpaint_random_weighted_blend(
+        original,
+        mask_dilated,
+        step=6,
+        ratio=0.05,
+        max_size=101,
+        main_weight=0.9,  # 40% from random texture
+        gaussian_ksize=15,
+        gaussian_sigma=0.5,
+        random_seed=50,
+    )
 
     cv2.imwrite(os.path.join(output_dir, "smart_crack_removed.jpg"), inpainted)
 
@@ -260,22 +278,23 @@ def test_smart_inpainting(image_path, output_dir="smart_results"):
     plt.subplot(1, 3, 1)
     plt.title("Original")
     plt.imshow(cv2.cvtColor(original, cv2.COLOR_BGR2RGB))
-    plt.axis('off')
+    plt.axis("off")
 
     plt.subplot(1, 3, 2)
     plt.title("Mask")
-    plt.imshow(mask_dilated, cmap='gray')
-    plt.axis('off')
+    plt.imshow(mask_dilated, cmap="gray")
+    plt.axis("off")
 
     plt.subplot(1, 3, 3)
     plt.title("Your Smart Method\nWeighted Blend + Gaussian")
     plt.imshow(cv2.cvtColor(inpainted, cv2.COLOR_BGR2RGB))
-    plt.axis('off')
+    plt.axis("off")
 
     plt.tight_layout()
-    # plt.show()
+    plt.show()
 
     return inpainted
+
 
 if __name__ == "__main__":
     image_path = "D:/University/Computer Vision/BTL/example/065.jpg"
