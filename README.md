@@ -9,7 +9,7 @@ Moreover, it also conducts some furthur experiments on inpainting crack regions 
 ## Structure
 
 - `main` branch contains most of the experiments.
-- `danh` branch contain experiments about phase congruency approach in crack detection, and slight experiment about using YOLO to detect cracks.
+- `danh` branch contain experiments about phase congruency approach (`phase_congruency.ipynb`) in crack detection, and slight experiment about using YOLO to detect cracks.
 
 ## Dataset
 
@@ -21,6 +21,7 @@ Moreover, it also conducts some furthur experiments on inpainting crack regions 
 
 - Experiment files: `*.ipynb`
   - `crack_detection_exp.ipynb`: experiments on crack detections
+  - `phase_congruency.ipynb`: experiments on crack detections with phase congruency (in branch `danh`)
   - `inpaint_exp.ipynb`: experiments on crack inpainting
 - `blending_experiments.py`: experiments on blending images into panorama and analyze it
 - `utils.py`: contains organized code collected from the experiment files
