@@ -22,6 +22,6 @@ test_blending/
 
 rp_note.md
 crack_detection.py
-test.py
+test*.py
 tree.py
 experiments.ipynb
