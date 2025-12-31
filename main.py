@@ -5,15 +5,18 @@ import matplotlib.pyplot as plt
 from utils import *
 
 image_path = "example/065.jpg"
+image_path = "real_life_image/jpg/6458.jpg"
 output_dir = "final_result"
 
 if os.path.exists(output_dir):
     shutil.rmtree(output_dir)
 os.makedirs(output_dir)
 
+image_path = downsample(cv2.imread(image_path), 0.1)
+
 print("Crack Detection...")
 crack_detection_obj = CrackDectection()
-original, final_mask = crack_detection_obj.crack_sobel_bothat(image_path, output_dir)
+original, final_mask = crack_detection_obj.crack_hist_clip(image_path, output_dir, low_thresh_ratio=0.1)
 
 # print(f"Org: {type(original)} - Size: {original.shape}")
 # print(f"Mask: {type(final_mask)} - Size: {final_mask.shape}")

@@ -8,7 +8,8 @@ Moreover, it also conducts some furthur experiments on inpainting crack regions 
 
 ## Structure
 
-`main` branch contains final version.
+`main` branch contains most of the experiments.
+`danh` branch contain experiments about phase congruency approach in crack detection, and slight experiment about using YOLO to detect cracks.
 
 ## Dataset
 
