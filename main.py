@@ -85,3 +85,41 @@ plt.axis("off")
 plt.tight_layout()
 plt.savefig(f"{output_dir}/grid.png")
 plt.show()
+
+# Blending
+inspector = PanoramicCrackInspector()
+
+image_paths = [
+    "crack_image_real_time/example_6.jpg",
+    "crack_image_real_time/example_7.jpg",
+]
+image_paths = [
+    "real_life_image/jpg/2025_12_27_17_45_IMG_6462.jpg",
+    "real_life_image/jpg/2025_12_27_17_45_IMG_6463.jpg",       
+]
+
+image_paths = [
+    "dataset/CrackForest-dataset-master/image/012.jpg",
+    # "dataset/CrackForest-dataset-master/image/013.jpg"
+]
+output_dir = "test_blending"
+if os.path.exists(output_dir):
+    shutil.rmtree(output_dir)
+    
+if len(image_paths) == 1:
+    print("Single image mode - processing without stitching...")
+
+    inspector.panorama = cv2.imread(image_paths[0])
+
+    crack_mask = inspector.detect_cracks(image_paths[0], "result")
+    os.makedirs(output_dir, exist_ok=True)
+    cv2.imwrite(f"{output_dir}/cracks_detected.png", crack_mask)
+
+    _ = inspector.calculate_severity(crack_mask)
+    _ = inspector.create_overlay(f"{output_dir}/overlay.png")
+
+    inspector.generate_report(f"{output_dir}/report.png")
+
+    print(f"\nProcessing complete! Check the '{output_dir}' directory.")
+else:
+    inspector.full_pipeline(image_paths, output_dir=output_dir)
