@@ -658,7 +658,6 @@ class PanoramicCrackInspector:
         print(f"\nAll results saved to '{output_dir}/' directory")
         print("=" * 60)
 
-
 # Example usage
 if __name__ == "__main__":
     # Initialize inspector
