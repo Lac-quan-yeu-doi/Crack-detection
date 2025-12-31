@@ -9,11 +9,11 @@ dataset/Concrete & Pavement Crack Dataset
 dataset/evaluation/CrackForest-dataset-master/groundTruth
 dataset/evaluation/CrackForest-dataset-master/seg
 output/
-example/
+# example/
 report/
 paper/
 result/
-real_life_image/
+# real_life_image/
 bitplane_results/
 final_result/
 result_inpainting/
